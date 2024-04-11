@@ -1,14 +1,15 @@
 import os
-from typing import Final
+from typing import Final, Union
 
 import cv2
 import imutils.paths
 from tqdm import tqdm
+from ultralytics import YOLO
 
-from src.utils import diverse
 from src.annotation.labelme import LabelMeAnnotation
 from src.annotation.supervisely import SuperviselyAnnotation
 from src.detection.detector import HybridDetector, IOU, RADIUS, CENTER_X, CENTER_Y
+from src.utils import diverse
 from src.utils.tile_cutter import TileCutter
 
 OUTPUT_FORMAT: Final = "labelme"
@@ -21,7 +22,15 @@ NB_CUTS: Final = 3
 MARGIN: Final = 20
 
 
-def detect_and_cut(detector, image_path, nb_cuts, margin):
+def detect_and_cut(detector: Union[YOLO, HybridDetector], image_path: str, nb_cuts: int, margin: int) -> None:
+    """
+    This function enables to detect rectangles thanks to AI object detector passed as parameter. When the detection is
+    done the image will be cut in several tiles with the corresponding annotation from AI object detection model.
+    :param detector: object detection model which will predict the bounding boxes
+    :param image_path: path of image that will be used for the prediction and the cut
+    :param nb_cuts: square root of the number of tiles
+    :param margin: overlap portion between tiles in pixels
+    """
     image_bgr = cv2.imread(image_path)
 
     predicted_rectangles = detector.detect(image_path)
@@ -49,7 +58,6 @@ def detect_and_cut(detector, image_path, nb_cuts, margin):
 
     for idx, tile in tqdm(enumerate(tiles)):
         tile0 = image_bgr[tile[1]: tile[3], tile[0]:tile[2]]
-        left_corner = [tile[0], tile[1]]
 
         img_height, img_width = tile0.shape[:2]
 
@@ -104,9 +112,10 @@ if __name__ == "__main__":
         model_path=r"C:\Users\tristan_cotte\PycharmProjects\Tools-PlatformImage\models\AMES\ames_yolov8.pt",
         iou=IOU, radius=RADIUS, center_x=CENTER_X, center_y=CENTER_Y)
 
+    # Perform on folder
     if os.path.isdir(SOURCE_PATH):
         for image_path in list(imutils.paths.list_images(SOURCE_PATH)):
             detect_and_cut(image_path=image_path, detector=detector, nb_cuts=NB_CUTS, margin=MARGIN)
-
+    # Perform on picture
     else:
         detect_and_cut(image_path=SOURCE_PATH, detector=detector, nb_cuts=NB_CUTS, margin=MARGIN)

@@ -7,7 +7,7 @@ from sahi import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from ultralytics import YOLO
 
-import utils
+from src.utils import diverse
 
 IOU = 0.3
 CONFIDENCE = 0.3
@@ -24,9 +24,9 @@ def filtered_smaller_bboxes(pred, threshold_area=200) -> List:
     """
     This function filters bounding boxes from SAHI in function of their area. If the area of one box exceeds a threshold value, this box will be remove.
     Otherwise, this box will be transform in x0 y0 x1 y1 format.
-    :pred: bounding boxes predicted by SAHI alogrithm
+    :pred: bounding boxes predicted by SAHI algorithm
     :threshold area: max area for bounding box to be kept
-    :return: list of bounding boxes in in x0 y0 x1 y1 format
+    :return: list of bounding boxes in x0 y0 x1 y1 format
     """
     smaller_bboxes = []
 
@@ -96,6 +96,13 @@ class Yolov8Detector:
 
 class HybridDetector:
     def __init__(self, model_path, **kwargs):
+        """
+        Hybrid solution consists in using firstly the YOLOv8 detector to detect the colonies which presents medium
+        area and then using the SAHI with YOLOv8 detector to detect the smaller colonies. Once we get the bounding
+        boxes from the two detectors, we will gather the results of the detectors. It will be important to avoid the
+        duplicates, so we certainly use Non-Maximum Suppression algorithm to avoid this fact.
+        :param model_path: YOLO model path
+        """
         self.iou = kwargs.get('iou', 0.3)
         self.confidence_yolo = kwargs.get('confidence_yolo', 0.3)
         self.confidence_sahi = kwargs.get('confidence_sahi', 0.3)
@@ -103,12 +110,13 @@ class HybridDetector:
         self.center_x = kwargs.get('center_x', 0)
         self.center_y = kwargs.get('center_y', 0)
         self.radius = kwargs.get('center_x', 3000)
+        self.image_size = kwargs.get('imgsz', 3000)
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         self.yolo_detector = Yolov8Detector(device=self.device, model_path=model_path, iou=self.iou,
                                             confidence=self.confidence_yolo,
-                                  imgsz=3000)
+                                  imgsz=self.image_size)
 
         # SAHI model
         self.sahi_detector = AutoDetectionModel.from_pretrained(
@@ -118,7 +126,22 @@ class HybridDetector:
             device=self.device  # if torch.cuda.is_available() else 'cpu'
         )
 
-    def detect(self, image_path):
+    def detect(self, image_path: str) -> np.ndarray:
+        """
+        We are going to enumerate all the steps which have to be done to create this *hybrid algorithm*:
+        1. Execute the YOLOv8 algorithm with the parameters currently used in the software in production.
+        2. Execute SAHI algorithm embedding YOLOv8 model executed previously. The optimal parameters have to be found ->
+        for the YOLOv8 and the sliding window.
+        3. (Falcutative) Set a differnent ID ofr the bounding boxes found on the first and the second
+        inferences. To do it, we can add a new column of the bounding box annotation. For example, id 0 for the first
+        prediction and id 1 for the second. This step seems to be facultative because it is useful only for the
+        visualisation (the color of the bbox could be different when we will plot the picture and its annotations).
+        4. Gather the annotations resulted from the step 1 and the step 2.
+        5. Remove all annotation which are not lying within the define circle. This circle represents the hole made in
+        the plexiglas and was computed thanks to ImageJ software.
+        :param image_path: path of the image in which we will use the hybrid algorithm
+        :return: array of bounding boxes
+        """
         image_bgr = cv2.imread(image_path)
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
@@ -135,7 +158,7 @@ class HybridDetector:
         gathered_bboxes = np.concatenate((smaller_bboxes_id, rectangles_id), axis=0)
         gathered_bboxes.astype(int)
 
-        nms_gathered_bboxes, _ = utils.nms_python(gathered_bboxes, np.array([0.5] * len(gathered_bboxes)), 0.3)
+        nms_gathered_bboxes, _ = diverse.nms_python(gathered_bboxes, np.array([0.5] * len(gathered_bboxes)), 0.3)
         filtered_circle_bboxes = filtered_bboxes_with_circle(bboxes=nms_gathered_bboxes, center_x=self.center_x,
                                                              center_y=self.center_y, radius=self.radius)
         return filtered_circle_bboxes

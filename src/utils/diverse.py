@@ -1,13 +1,20 @@
 import os
 import random
 import shutil
+from typing import Union, List
 
 import cv2
 import matplotlib.colors as mcolors
 import numpy as np
 
 
-def filter_predictions_by_tile(bboxes, tile):
+def filter_predictions_by_tile(bboxes: Union[np.array, List], tile: Union[List, np.array]) -> List:
+    """
+    Filter bounding boxes which are inside the given tile.
+    :param bboxes: list of bounding boxes
+    :param tile: array of tile coordinates in format [x_min, y_min, x_max, y_max]
+    :return: index of bounding boxes which are inside the given tile
+    """
     filtered_idx = []
     x0, y0, x1, y1 = tile
     for idx, box in enumerate(bboxes):
@@ -20,26 +27,25 @@ def filter_predictions_by_tile(bboxes, tile):
 
 
 def random_color_generator() -> (int, int, int):
+    """
+    Generate random color
+    :return: tuple of random color in RGB format
+    """
     color = random.choice(list(mcolors.CSS4_COLORS.values()))
     return color
 
 
 def nms_python(bboxes: np.array, psocres: np.array, threshold: int):
-    '''
-    NMS: first sort the bboxes by scores ,
-        keep the bbox with highest score as reference,
-        iterate through all other bboxes,
-        calculate Intersection Over Union (IOU) between reference bbox and other bbox
-        if iou is greater than threshold,then discard the bbox and continue.
-
-    Input:
-        bboxes(numpy array of tuples) : Bounding Box Proposals in the format (x_min,y_min,x_max,y_max).
-        pscores(numpy array of floats) : confidance scores for each bbox in bboxes.
-        threshold(float): Overlapping threshold above which proposals will be discarded.
-
-    Output:
-        filtered_bboxes(numpy array) :selected bboxes for which IOU is less than threshold.
-    '''
+    """
+    Perform non-max suppression algorithm.
+     NMS: First sort the bboxes by scores then sort the bboxes with highest score as reference.
+          Iterate through all other bboxes and calculate Intersection Over Union (IOU) between reference bbox and other
+          bboxes. If IOU is greater than threshold,then discard the bbox and continue.
+    :param bboxes: bounding Box proposals in the format (x_min,y_min,x_max,y_max)
+    :param psocres: confidence scores for each bbox in bboxes
+    :param threshold: overlapping threshold above which proposals will be discarded
+    :return: selected bboxes for which IOU is less than threshold and indexes of input bounding boxes that were removed
+    """
     # Unstacking Bounding Box Coordinates
     bboxes = bboxes.astype('float')
     x_min = bboxes[:, 0]
@@ -91,6 +97,12 @@ def nms_python(bboxes: np.array, psocres: np.array, threshold: int):
 
 
 def draw_tiles(image: np.array, tiles: np.array) -> np.array:
+    """
+    Draw tiles in picture using cv2 rectangle.
+    :param image: image where the rectangles which represent the tiles will be drawn
+    :param tiles: array of tile coordinates in format [x_min, y_min, x_max, y_max]
+    :return: picture where tiles are represented as rectangles
+    """
     color = (255, 0, 0)
     thickness = 2
 
@@ -99,7 +111,15 @@ def draw_tiles(image: np.array, tiles: np.array) -> np.array:
     return image
 
 
-def rectangle_translation(rectangle, translation_x, translation_y) -> [int, int, int, int]:
+def rectangle_translation(rectangle: Union[np.array, List], translation_x: int, translation_y: int) -> [int, int, int,
+                                                                                                        int]:
+    """
+    Translate rectangle coordinates in function of two offsets parameters (one in abscissa and one in ordinate).
+    :param rectangle: rectangle which has to be moved
+    :param translation_x: abscissa offset
+    :param translation_y: ordinate offset
+    :return: moved rectangle in format [x_min, y_min, x_max, y_max]
+    """
     if len(rectangle) == 2:
         pt1 = rectangle[0]
         pt2 = rectangle[1]
@@ -113,11 +133,11 @@ def rectangle_translation(rectangle, translation_x, translation_y) -> [int, int,
     return [x1 + translation_x, y1 + translation_y, x2 + translation_x, y2 + translation_y]
 
 
-def flatten_rectangle(rectangle):
-    return [rectangle[0][0], rectangle[0][1], rectangle[1][0], rectangle[1][1]]
-
-
-def clean_directory(directory_path):
+def clean_directory(directory_path: str) -> None:
+    """
+    Delete all files and folder in given directory.
+    :param directory_path: path of directory to be empty
+    """
     for file in os.listdir(directory_path):
         if os.path.isfile(file):
             os.remove(os.path.join(directory_path, file))

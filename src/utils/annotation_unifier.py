@@ -7,7 +7,7 @@ import imagesize
 import numpy as np
 
 from src.annotation.labelme import LabelMeAnnotation
-from src.annotation.supervisely import SuperviselyAnnotation
+from src.annotation.supervisely import SuperviselyAnnotation, get_slylabelfile_from_imgfile
 from diverse import nms_python
 
 SHOW_NMS = False
@@ -70,24 +70,24 @@ class AnnotationUnifier:
         position_y = image_index // nb_images_in_line
         return position_x, position_y
 
-    @staticmethod
-    def get_slylabelfile_from_imgfile(img_path: str) -> None:
-        """
-        Get path of Supervise.ly label file from path of image file.
-        :param img_path: path of image file
-        :return: path of Supervise.ly label file
-        """
-        path = os.path.abspath(img_path)
-        splitted_path = path.split(os.sep)
-        if platform.system() == "Windows":
-            label_path = os.path.join("C:\\", *splitted_path[1:-2], "ann", splitted_path[-1] + ".json")
-
-            if not os.path.isdir(os.path.join("C:\\", *splitted_path[1:-2], "ann")):
-                os.makedirs(os.path.join("C:\\", *splitted_path[1:-2], "ann"))
-            return label_path
-        else:
-            label_path = os.path.join(*splitted_path[2:-1], "../sly/ann", splitted_path[-1] + ".json")
-            return os.path.abspath(label_path)
+    # @staticmethod
+    # def get_slylabelfile_from_imgfile(img_path: str) -> None:
+    #     """
+    #     Get path of Supervise.ly label file from path of image file.
+    #     :param img_path: path of image file
+    #     :return: path of Supervise.ly label file
+    #     """
+    #     path = os.path.abspath(img_path)
+    #     splitted_path = path.split(os.sep)
+    #     if platform.system() == "Windows":
+    #         label_path = os.path.join("C:\\", *splitted_path[1:-2], "ann", splitted_path[-1] + ".json")
+    #
+    #         if not os.path.isdir(os.path.join("C:\\", *splitted_path[1:-2], "ann")):
+    #             os.makedirs(os.path.join("C:\\", *splitted_path[1:-2], "ann"))
+    #         return label_path
+    #     else:
+    #         label_path = os.path.join(*splitted_path[2:-1], "../sly/ann", splitted_path[-1] + ".json")
+    #         return os.path.abspath(label_path)
 
     def unify_annotations(self) -> None:
         """
@@ -143,7 +143,7 @@ class AnnotationUnifier:
             # Write Supervise.ly file
             sly_ann = SuperviselyAnnotation(img_size=imagesize.get(self.whole_image_path))
             sly_ann.add_rectangles(rectangles=nms_picture_rectangles, cls=[label.cls for label in nms_labels])
-            sly_ann.write_ann_file(output_path=self.get_slylabelfile_from_imgfile(self.whole_image_path))
+            sly_ann.write_ann_file(output_path=get_slylabelfile_from_imgfile(self.whole_image_path))
 
 
 if __name__ == "__main__":
@@ -152,5 +152,4 @@ if __name__ == "__main__":
         whole_image_path=r"/new_picture.jpg",
         margin=20)
     ann_file = au.annotations_files_list[0]
-    # au.get_objects_from_annotation_file(ann_file)
     au.unify_annotations()

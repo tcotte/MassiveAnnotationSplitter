@@ -10,12 +10,24 @@ from src.utils.tile_unifier import TileUnifier
 FORMAT_DICT: Final = {1: 'labelme', 2: 'supervisely'}
 
 
-def unify_image_and_annotations(input_cut_image_folder_path: str, input_cut_ann_folder_path: str, output_folder: str,
+def unify_tiles_and_annotations(input_cut_image_folder_path: str, input_cut_ann_folder_path: str, output_folder: str,
                                 margin: int, format: str) -> None:
+    """
+    Unify tiles and gather the annotations to recompose the whole picture with its annotations.
+    :param input_cut_image_folder_path: path of the image tiles folder
+    :param input_cut_ann_folder_path: path of the annotation tiles folder
+    :param output_folder: path of the folder where the output will be delivered
+    :param margin: margin used to divide the image into mosaic
+    :param format: input/output annotation format
+    :return: None
+    """
+    # Unify tiles to recompose picture
     tile_unifier = TileUnifier(path_images=input_cut_image_folder_path, margin=margin)
+    # Save the recomposed picture
     path_recomposed_image = os.path.join(output_folder, f"{input_cut_image_folder_path.split(os.sep)[-1]}.jpg")
     cv2.imwrite(path_recomposed_image, tile_unifier.recompose_picture())
 
+    # Gather annotation tiles and reframe it in function of their tile position
     au = AnnotationUnifier(
         path_annotations=input_cut_ann_folder_path,
         whole_image_path=path_recomposed_image,
@@ -65,7 +77,7 @@ if __name__ == "__main__":
             os.makedirs(supervisely_img_filepath)
 
         for ds_path in datasets:
-            unify_image_and_annotations(input_cut_ann_folder_path=os.path.join(ds_path, "img"),
+            unify_tiles_and_annotations(input_cut_ann_folder_path=os.path.join(ds_path, "img"),
                                         input_cut_image_folder_path=os.path.join(ds_path, "ann"),
                                         output_folder=args.destination,
                                         margin=args.margin,
@@ -75,7 +87,7 @@ if __name__ == "__main__":
         # if datasets exist, perform unification for all datasets
         if len(datasets):
             for ds_path in datasets:
-                unify_image_and_annotations(input_cut_image_folder_path=ds_path,
+                unify_tiles_and_annotations(input_cut_image_folder_path=ds_path,
                                             input_cut_ann_folder_path=args.source,
                                             output_folder=args.destination,
                                             margin=args.margin,
@@ -83,7 +95,7 @@ if __name__ == "__main__":
         # if not any dataset exists, the input folder transmitted as argument parser is the folder which represent only
         # one picture
         else:
-            unify_image_and_annotations(input_cut_image_folder_path=args.source,
+            unify_tiles_and_annotations(input_cut_image_folder_path=args.source,
                                         input_cut_ann_folder_path=args.source,
                                         output_folder=args.destination,
                                         margin=args.margin,
